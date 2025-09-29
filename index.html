@@ -152,12 +152,13 @@
             </button>
             <h2 id="end-game-title" class="text-3xl font-bold mb-2"></h2>
             <p id="end-game-message" class="text-gray-300 mb-4"></p>
-            <div class="bg-gray-700/50 p-3 rounded-lg mb-6">
+            <div id="correct-answer-container" class="bg-gray-700/50 p-3 rounded-lg mb-6 hidden">
                 <p class="text-sm text-gray-400">La respuesta era:</p>
                 <p id="correct-answer-text" class="text-2xl font-semibold text-green-400"></p>
             </div>
             <!-- Stats will be shown here after game ends -->
             <div id="modal-stats-container"></div>
+            <button id="reveal-answer-btn" class="hidden w-full p-3 rounded-lg text-white font-bold btn-secondary mb-4">Revelar Respuesta</button>
             <button id="share-btn" class="hidden w-full p-3 rounded-lg text-white font-bold bg-green-600 hover:bg-green-700 mb-4 flex items-center justify-center gap-2">
                 Compartir Resultado
             </button>
@@ -194,8 +195,10 @@
         const endGameCard = document.getElementById('end-game-card');
         const endGameTitle = document.getElementById('end-game-title');
         const endGameMessage = document.getElementById('end-game-message');
+        const correctAnswerContainer = document.getElementById('correct-answer-container');
         const correctAnswerText = document.getElementById('correct-answer-text');
         const shareBtn = document.getElementById('share-btn');
+        const revealAnswerBtn = document.getElementById('reveal-answer-btn');
         const countdownTimerEl = document.getElementById('countdown-timer');
         const closeModalBtn = document.getElementById('close-modal-btn');
         
@@ -268,6 +271,10 @@
             shareBtn.addEventListener('click', shareResult);
             shareStatsBtn.addEventListener('click', shareResult);
             closeModalBtn.addEventListener('click', closeEndGameModal);
+            revealAnswerBtn.addEventListener('click', () => {
+                correctAnswerContainer.classList.remove('hidden');
+                revealAnswerBtn.classList.add('hidden');
+            });
         }
 
         async function fetchNewPuzzle(dateString) {
@@ -383,25 +390,32 @@ La respuesta debe estar en un formato JSON estricto, sin texto adicional antes o
             gameStateEl.style.filter = 'blur(5px)';
             correctAnswerText.textContent = dailyData.answer;
 
+            // Reset visibility for all conditional elements
+            correctAnswerContainer.classList.add('hidden');
+            revealAnswerBtn.classList.add('hidden');
+            shareBtn.classList.add('hidden');
+            endGameTitle.classList.remove('text-green-400', 'text-red-400');
+            endGameCard.classList.remove('border-green-500', 'border-red-500');
+
             if (playerState.gameWon) {
-                endGameCard.classList.remove('border-red-500');
                 endGameCard.classList.add('border-green-500');
                 endGameTitle.textContent = "¡Felicitaciones!";
                 endGameTitle.classList.add('text-green-400');
                 endGameMessage.textContent = `¡Adivinaste la palabra en ${playerState.lastCluesUsed} pistas!`;
                 shareBtn.classList.remove('hidden');
+                correctAnswerContainer.classList.remove('hidden');
             } else {
-                endGameCard.classList.remove('border-green-500');
                 endGameCard.classList.add('border-red-500');
                 endGameTitle.textContent = "¡Inténtalo Mañana!";
                 endGameTitle.classList.add('text-red-400');
                 endGameMessage.textContent = "Usaste todas las pistas. ¡Más suerte la próxima!";
-                shareBtn.classList.add('hidden');
+                revealAnswerBtn.classList.remove('hidden');
             }
             
             modalStatsContainer.innerHTML = statsScreen.querySelector('.bg-gray-700\\/50').outerHTML;
             modalStatsContainer.querySelector('#stats-plays').textContent = playerStats.plays;
-            modalStatsContainer.querySelector('#stats-wins').textContent = `${Math.round((playerStats.wins / playerStats.plays) * 100)}%`;
+            const winPercentage = playerStats.plays > 0 ? Math.round((playerStats.wins / playerStats.plays) * 100) : 0;
+            modalStatsContainer.querySelector('#stats-wins').textContent = `${winPercentage}%`;
             modalStatsContainer.querySelector('#stats-streak').textContent = playerStats.currentStreak;
             
             endGameModal.classList.remove('hidden');
