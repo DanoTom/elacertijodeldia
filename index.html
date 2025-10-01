@@ -5,24 +5,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>El Acertijo del Día</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Poppins', sans-serif;
+            overflow: hidden; /* Prevent scrollbars from the canvas */
+        }
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
         }
         .card {
-            background-color: #1f2937; /* bg-gray-800 */
+            background-color: rgba(31, 41, 55, 0.85); /* bg-gray-800 with transparency */
             border: 1px solid #374151; /* border-gray-700 */
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         }
         .btn-primary {
             background-color: #3b82f6; /* bg-blue-600 */
-            transition: background-color 0.3s ease;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 14px 0 rgba(0, 118, 255, 0.39);
         }
         .btn-primary:hover {
             background-color: #2563eb; /* bg-blue-700 */
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px 0 rgba(0, 118, 255, 0.23);
         }
         .btn-secondary {
             background-color: #4b5563; /* bg-gray-600 */
@@ -31,87 +47,66 @@
         .btn-secondary:hover {
             background-color: #374151; /* bg-gray-700 */
         }
+        .btn-danger-outline {
+            background-color: transparent;
+            border: 1px solid #ef4444; /* border-red-500 */
+            color: #ef4444; /* text-red-500 */
+            transition: all 0.3s ease;
+        }
+        .btn-danger-outline:hover {
+            background-color: #ef4444;
+            color: white;
+        }
         .input-field {
             background-color: #374151; /* bg-gray-700 */
             border: 1px solid #4b5563; /* border-gray-600 */
         }
-        .hidden {
-            display: none;
-        }
+        .hidden { display: none; }
         @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-            20%, 40%, 60%, 80% { transform: translateX(5px); }
+            0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); } 20%, 40%, 60%, 80% { transform: translateX(5px); }
         }
-        .shake {
-            animation: shake 0.5s ease-in-out;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .fade-in {
-            animation: fadeIn 0.5s ease-out forwards;
-        }
+        .shake { animation: shake 0.5s ease-in-out; }
+        .fade-in { opacity: 0; } /* Initial state for anime.js */
     </style>
 </head>
 <body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
 
+    <canvas id="bg-canvas"></canvas>
+
     <!-- Welcome Screen -->
-    <div id="welcome-screen" class="w-full max-w-md mx-auto text-center card rounded-lg p-8 fade-in">
-        <div class="text-6xl mb-4">🕵️‍♂️</div>
-        <h1 class="text-4xl font-bold text-blue-400 mb-4">El Acertijo del Día</h1>
-        <p class="text-gray-300 mb-6">
-            ¿Podrás adivinar la palabra o frase secreta con solo 5 pistas?
+    <div id="welcome-screen" class="w-full max-w-md mx-auto text-center p-8">
+        <div id="welcome-emoji" class="text-7xl mb-6 fade-in">🕵️‍♂️</div>
+        <h1 id="welcome-title" class="text-5xl font-bold text-blue-400 mb-4 fade-in">El Acertijo del Día</h1>
+        <p id="welcome-subtitle" class="text-gray-300 mb-8 fade-in">
+            Un nuevo desafío mental te espera cada día.
         </p>
-        <div class="text-left bg-gray-900/50 rounded-lg p-4 mb-8 space-y-3 text-gray-400">
-            <p><span class="text-blue-400 font-bold">1.</span> Cada día un nuevo desafío te espera.</p>
-            <p><span class="text-blue-400 font-bold">2.</span> Recibirás una pista a la vez, de la más difícil a la más fácil.</p>
-            <p><span class="text-blue-400 font-bold">3.</span> Intenta adivinar con la menor cantidad de pistas posible.</p>
-        </div>
-        <button id="start-game-btn" class="w-full p-3 rounded-lg text-white font-bold btn-primary text-lg">¡A Jugar!</button>
+        <button id="start-game-btn" class="w-full p-4 rounded-lg text-white font-bold btn-primary text-xl fade-in">¡A Jugar!</button>
     </div>
 
     <div id="game-container" class="w-full max-w-md mx-auto hidden">
-
         <!-- Loading State -->
         <div id="loading-state" class="text-center">
-            <svg class="animate-spin h-8 w-8 text-blue-500 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
+            <svg class="animate-spin h-8 w-8 text-blue-500 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
             <p class="text-lg text-gray-400">Generando el acertijo de hoy...</p>
         </div>
 
         <!-- Game State -->
         <div id="game-state" class="hidden">
-            <header class="text-center mb-6">
-                <h1 class="text-4xl font-bold text-blue-400">El Acertijo del Día</h1>
-                <p id="game-date" class="text-gray-400"></p>
-            </header>
-
+            <header class="text-center mb-6"><h1 class="text-4xl font-bold text-blue-400">El Acertijo del Día</h1><p id="game-date" class="text-gray-400"></p></header>
             <main>
-                <div id="clues-container" class="card rounded-lg p-6 mb-4">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-xl font-semibold">Pista Actual</h2>
-                        <span id="clue-counter" class="text-sm font-semibold bg-blue-500/20 text-blue-300 px-3 py-1 rounded-full">1 / 5</span>
-                    </div>
-                    <p id="clue-text" class="text-gray-300 text-center text-lg min-h-[56px] flex items-center justify-center"></p>
+                <div id="clues-container" class="card rounded-lg p-6 mb-4"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-semibold">Pista Actual</h2><span id="clue-counter" class="text-sm font-semibold bg-blue-500/20 text-blue-300 px-3 py-1 rounded-full">1 / 5</span></div><p id="clue-text" class="text-gray-300 text-center text-lg min-h-[56px] flex items-center justify-center"></p></div>
+                <form id="guess-form" class="flex flex-col gap-3 mb-4"><input type="text" id="guess-input" placeholder="Escribe tu respuesta..." class="w-full p-3 rounded-lg text-white input-field focus:outline-none focus:ring-2 focus:ring-blue-500" autocomplete="off"><button type="submit" class="w-full p-3 rounded-lg text-white font-bold btn-primary">Enviar</button></form>
+                <div class="grid grid-cols-2 gap-3">
+                    <button id="give-up-btn" class="w-full p-3 rounded-lg font-bold btn-danger-outline">Rendirse</button>
+                    <button id="next-clue-btn" class="w-full p-3 rounded-lg text-white font-bold btn-secondary">Siguiente Pista</button>
                 </div>
-                
-                <form id="guess-form" class="flex flex-col gap-3 mb-4">
-                    <input type="text" id="guess-input" placeholder="Escribe tu respuesta..." class="w-full p-3 rounded-lg text-white input-field focus:outline-none focus:ring-2 focus:ring-blue-500" autocomplete="off">
-                    <button type="submit" class="w-full p-3 rounded-lg text-white font-bold btn-primary">Enviar</button>
-                </form>
-                
-                <button id="next-clue-btn" class="w-full p-3 rounded-lg text-white font-bold btn-secondary">Siguiente Pista</button>
                 <p id="feedback-message" class="text-center text-red-400 mt-3 min-h-[24px]"></p>
             </main>
         </div>
     </div>
 
     <!-- Post-Game Stats Screen -->
-    <div id="stats-screen" class="hidden w-full max-w-md mx-auto text-center card rounded-lg p-8 fade-in">
+    <div id="stats-screen" class="hidden w-full max-w-md mx-auto text-center card rounded-lg p-8">
          <h1 class="text-3xl font-bold text-blue-400 mb-6">El Acertijo del Día</h1>
          <p class="text-gray-400 mb-4">¡Ya jugaste hoy! Vuelve mañana para un nuevo desafío.</p>
          
@@ -146,7 +141,7 @@
 
     <!-- End Game Modal -->
     <div id="end-game-modal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4">
-        <div id="end-game-card" class="card rounded-lg p-8 text-center w-full max-w-sm fade-in relative">
+        <div id="end-game-card" class="card rounded-lg p-8 text-center w-full max-w-sm relative">
             <button id="close-modal-btn" class="absolute top-2 right-2 text-gray-500 hover:text-white p-1">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
@@ -156,7 +151,6 @@
                 <p class="text-sm text-gray-400">La respuesta era:</p>
                 <p id="correct-answer-text" class="text-2xl font-semibold text-green-400"></p>
             </div>
-            <!-- Stats will be shown here after game ends -->
             <div id="modal-stats-container"></div>
             <button id="reveal-answer-btn" class="hidden w-full p-3 rounded-lg text-white font-bold btn-secondary mb-4">Revelar Respuesta</button>
             <button id="share-btn" class="hidden w-full p-3 rounded-lg text-white font-bold bg-green-600 hover:bg-green-700 mb-4 flex items-center justify-center gap-2">
@@ -180,7 +174,6 @@
         const startGameBtn = document.getElementById('start-game-btn');
         const gameContainer = document.getElementById('game-container');
         const statsScreen = document.getElementById('stats-screen');
-        
         const loadingState = document.getElementById('loading-state');
         const gameStateEl = document.getElementById('game-state');
         const gameDateEl = document.getElementById('game-date');
@@ -189,8 +182,8 @@
         const guessForm = document.getElementById('guess-form');
         const guessInput = document.getElementById('guess-input');
         const nextClueBtn = document.getElementById('next-clue-btn');
+        const giveUpBtn = document.getElementById('give-up-btn');
         const feedbackMessage = document.getElementById('feedback-message');
-        
         const endGameModal = document.getElementById('end-game-modal');
         const endGameCard = document.getElementById('end-game-card');
         const endGameTitle = document.getElementById('end-game-title');
@@ -201,7 +194,6 @@
         const revealAnswerBtn = document.getElementById('reveal-answer-btn');
         const countdownTimerEl = document.getElementById('countdown-timer');
         const closeModalBtn = document.getElementById('close-modal-btn');
-        
         const statsPlays = document.getElementById('stats-plays');
         const statsWins = document.getElementById('stats-wins');
         const statsStreak = document.getElementById('stats-streak');
@@ -211,11 +203,60 @@
 
         // --- ESTADO DEL JUEGO ---
         let dailyData = { answer: '', clues: [] };
-        let playerState = { currentClueIndex: 0, gameOver: false, gameWon: false, lastCluesUsed: 0 };
+        let playerState = { currentClueIndex: 0, gameOver: false, gameWon: false, gaveUp: false, lastCluesUsed: 0 };
         let playerStats = { plays: 0, wins: 0, currentStreak: 0, lastPlayDate: null };
 
+        // --- ANIMACIONES ---
+        function initBackgroundAnimation() {
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('bg-canvas'), alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+
+            const particles = new THREE.Group();
+            const particleGeometry = new THREE.SphereGeometry(0.02, 8, 8);
+            const particleMaterial = new THREE.MeshBasicMaterial({ color: 0x3b82f6 });
+
+            for (let i = 0; i < 500; i++) {
+                const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+                particle.position.set( (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10 );
+                particles.add(particle);
+            }
+            scene.add(particles);
+            camera.position.z = 5;
+
+            const animate = () => {
+                requestAnimationFrame(animate);
+                particles.rotation.x += 0.0005;
+                particles.rotation.y += 0.001;
+                renderer.render(scene, camera);
+            };
+            animate();
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+        
+        function playWelcomeAnimation() {
+            const tl = anime.timeline({ easing: 'easeOutExpo' });
+            tl.add({
+                targets: ['#welcome-emoji', '#welcome-title', '#welcome-subtitle', '#start-game-btn'],
+                translateY: (el, i) => [i < 2 ? -30 : 20, 0],
+                opacity: [0, 1],
+                scale: (el, i) => [i === 0 ? 0.8 : 1, 1],
+                duration: 800,
+                delay: anime.stagger(100)
+            });
+        }
+
         // --- LÓGICA PRINCIPAL ---
-        document.addEventListener('DOMContentLoaded', main);
+        document.addEventListener('DOMContentLoaded', () => {
+            initBackgroundAnimation();
+            main();
+        });
 
         function main() {
             loadStats();
@@ -223,24 +264,32 @@
             const storedGame = JSON.parse(localStorage.getItem(GAME_STORAGE_KEY));
 
             if (storedGame && storedGame.date === todayString && storedGame.playerState.gameOver) {
-                // Ya jugó hoy, mostrar estadísticas
                 playerState = storedGame.playerState;
                 welcomeScreen.classList.add('hidden');
                 gameContainer.classList.add('hidden');
                 renderStatsScreen();
                 statsScreen.classList.remove('hidden');
+                 anime({ targets: '#stats-screen', translateY: [-20, 0], opacity: [0, 1], duration: 800, easing: 'easeOutExpo' });
             } else {
-                // No ha jugado o es un nuevo día, mostrar bienvenida
                 welcomeScreen.classList.remove('hidden');
                 statsScreen.classList.add('hidden');
                 gameContainer.classList.add('hidden');
+                playWelcomeAnimation();
                 startGameBtn.addEventListener('click', () => {
-                    welcomeScreen.classList.add('hidden');
-                    gameContainer.classList.remove('hidden');
-                    initializeGame();
+                     anime({
+                        targets: '#welcome-screen',
+                        opacity: 0,
+                        duration: 500,
+                        easing: 'easeInExpo',
+                        complete: () => {
+                            welcomeScreen.classList.add('hidden');
+                            gameContainer.classList.remove('hidden');
+                            initializeGame();
+                        }
+                    });
                 });
             }
-             startCountdown();
+            startCountdown();
         }
 
         async function initializeGame() {
@@ -268,6 +317,7 @@
         function setupEventListeners() {
             guessForm.addEventListener('submit', handleGuess);
             nextClueBtn.addEventListener('click', revealNextClue);
+            giveUpBtn.addEventListener('click', handleGiveUp);
             shareBtn.addEventListener('click', shareResult);
             shareStatsBtn.addEventListener('click', shareResult);
             closeModalBtn.addEventListener('click', closeEndGameModal);
@@ -286,13 +336,14 @@ La respuesta puede ser una palabra o una frase corta (ej. 'Big Ben', 'ADN', 'Ví
 Prioriza las siguientes temáticas al generar el acertijo:
 - Países y ciudades. - Tecnología. - Historia (no tan dificil). - Música de los últimos 40 años (rock y pop). - Cine (no tan difícil pero desafiante).
 
+Muy importante: Todas las referencias culturales, especialmente títulos de películas, series o libros, deben usar los nombres con los que son conocidos en Argentina y América Latina. Evita regionalismos de España. Por ejemplo, 'The Matrix' es 'Matrix', no 'La Matriz'; 'Die Hard' es 'Duro de Matar', no 'La Jungla de Cristal'.
+
 Debes proporcionar 5 pistas en orden de dificultad progresiva: la primera muy difícil y abstracta, y la última muy fácil y directa.
 La respuesta debe estar en un formato JSON estricto, sin texto adicional antes o después. El JSON debe tener dos claves: "answer" (string) y "clues" (un array de 5 strings).`;
             
             const userQuery = `Genera el acertijo para la fecha: ${dateString}.`;
 
             try {
-                // --- Fetch logic remains the same ---
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -310,11 +361,9 @@ La respuesta debe estar en un formato JSON estricto, sin texto adicional antes o
                     throw new Error("Formato de API inesperado.");
                 }
                 dailyData = puzzle;
-                // Reset player state for the new day
-                playerState = { currentClueIndex: 0, gameOver: false, gameWon: false, lastCluesUsed: 0 };
+                playerState = { currentClueIndex: 0, gameOver: false, gameWon: false, gaveUp: false, lastCluesUsed: 0 };
                 saveGameState();
                 renderGame();
-
             } catch (error) {
                 console.error("Error al obtener el desafío:", error);
                 showError("No se pudo cargar el desafío de hoy. Inténtalo de nuevo más tarde.");
@@ -324,7 +373,6 @@ La respuesta debe estar en un formato JSON estricto, sin texto adicional antes o
         function handleGuess(e) {
             e.preventDefault();
             if (playerState.gameOver) return;
-
             const guess = guessInput.value.trim();
             if (!guess) return;
 
@@ -350,6 +398,13 @@ La respuesta debe estar en un formato JSON estricto, sin texto adicional antes o
             }
         }
 
+        function handleGiveUp() {
+            if (playerState.gameOver) return;
+            playerState.gameWon = false;
+            playerState.gaveUp = true;
+            endGame();
+        }
+
         function endGame() {
             playerState.gameOver = true;
             playerState.lastCluesUsed = playerState.currentClueIndex + 1;
@@ -364,7 +419,7 @@ La respuesta debe estar en un formato JSON estricto, sin texto adicional antes o
             renderClue();
             if (playerState.currentClueIndex === 4) {
                  nextClueBtn.disabled = true;
-                 nextClueBtn.textContent = 'Última pista revelada';
+                 nextClueBtn.textContent = 'Última pista';
             }
             saveGameState();
         }
@@ -372,30 +427,41 @@ La respuesta debe estar en un formato JSON estricto, sin texto adicional antes o
         function renderGame() {
             loadingState.classList.add('hidden');
             gameStateEl.classList.remove('hidden');
+            anime({ targets: '#game-state', opacity: [0, 1], duration: 600 });
             renderClue();
             guessInput.value = '';
             nextClueBtn.disabled = playerState.currentClueIndex >= 4;
-            if (playerState.currentClueIndex === 4) nextClueBtn.textContent = 'Última pista revelada';
+            if (playerState.currentClueIndex === 4) nextClueBtn.textContent = 'Última pista';
         }
 
         function renderClue() {
-            clueTextEl.textContent = dailyData.clues[playerState.currentClueIndex];
-            clueCounterEl.textContent = `${playerState.currentClueIndex + 1} / 5`;
-            clueTextEl.classList.remove('fade-in');
-            void clueTextEl.offsetWidth;
-            clueTextEl.classList.add('fade-in');
+            const clueContainer = document.getElementById('clue-text');
+            anime({
+                targets: clueContainer,
+                opacity: 0,
+                duration: 250,
+                easing: 'easeInExpo',
+                complete: () => {
+                    clueContainer.textContent = dailyData.clues[playerState.currentClueIndex];
+                    clueCounterEl.textContent = `${playerState.currentClueIndex + 1} / 5`;
+                    anime({
+                        targets: clueContainer,
+                        opacity: 1,
+                        duration: 250,
+                        easing: 'easeOutExpo'
+                    });
+                }
+            });
         }
 
         function showEndGameScreen() {
             gameStateEl.style.filter = 'blur(5px)';
             correctAnswerText.textContent = dailyData.answer;
-
-            // Reset visibility for all conditional elements
             correctAnswerContainer.classList.add('hidden');
             revealAnswerBtn.classList.add('hidden');
             shareBtn.classList.add('hidden');
-            endGameTitle.classList.remove('text-green-400', 'text-red-400');
-            endGameCard.classList.remove('border-green-500', 'border-red-500');
+            endGameTitle.classList.remove('text-green-400', 'text-red-400', 'text-yellow-400');
+            endGameCard.classList.remove('border-green-500', 'border-red-500', 'border-yellow-500');
 
             if (playerState.gameWon) {
                 endGameCard.classList.add('border-green-500');
@@ -404,6 +470,12 @@ La respuesta debe estar en un formato JSON estricto, sin texto adicional antes o
                 endGameMessage.textContent = `¡Adivinaste la palabra en ${playerState.lastCluesUsed} pistas!`;
                 shareBtn.classList.remove('hidden');
                 correctAnswerContainer.classList.remove('hidden');
+            } else if (playerState.gaveUp) {
+                endGameCard.classList.add('border-yellow-500');
+                endGameTitle.textContent = "Te Rendiste";
+                endGameTitle.classList.add('text-yellow-400');
+                endGameMessage.textContent = "¡Más suerte la próxima vez!";
+                revealAnswerBtn.classList.remove('hidden');
             } else {
                 endGameCard.classList.add('border-red-500');
                 endGameTitle.textContent = "¡Inténtalo Mañana!";
@@ -419,6 +491,7 @@ La respuesta debe estar en un formato JSON estricto, sin texto adicional antes o
             modalStatsContainer.querySelector('#stats-streak').textContent = playerStats.currentStreak;
             
             endGameModal.classList.remove('hidden');
+            anime({targets: '#end-game-card', scale: [0.8, 1], opacity: [0, 1], duration: 500, easing: 'easeOutExpo'});
             disableGameInteractions();
         }
 
@@ -427,39 +500,45 @@ La respuesta debe estar en un formato JSON estricto, sin texto adicional antes o
              const winPercentage = playerStats.plays > 0 ? Math.round((playerStats.wins / playerStats.plays) * 100) : 0;
              statsWins.textContent = `${winPercentage}%`;
              statsStreak.textContent = playerStats.currentStreak;
-             if (playerState.gameWon) {
-                 shareStatsBtn.classList.remove('hidden');
-             } else {
-                 shareStatsBtn.classList.add('hidden');
-             }
+             shareStatsBtn.style.display = playerState.gameWon ? 'flex' : 'none';
         }
 
         function closeEndGameModal() {
-            endGameModal.classList.add('hidden');
-            gameStateEl.style.filter = 'none';
-            // After closing modal, show the main stats screen
-            gameContainer.classList.add('hidden');
-            renderStatsScreen();
-            statsScreen.classList.remove('hidden');
+            anime({
+                targets: '#end-game-card',
+                scale: 0.8,
+                opacity: 0,
+                duration: 300,
+                easing: 'easeInExpo',
+                complete: () => {
+                    endGameModal.classList.add('hidden');
+                    gameStateEl.style.filter = 'none';
+                    gameContainer.classList.add('hidden');
+                    renderStatsScreen();
+                    statsScreen.classList.remove('hidden');
+                    anime({ targets: '#stats-screen', translateY: [-20, 0], opacity: [0, 1], duration: 800, easing: 'easeOutExpo' });
+                }
+            });
         }
 
         function disableGameInteractions() {
             guessInput.disabled = true;
             guessForm.querySelector('button').disabled = true;
             nextClueBtn.disabled = true;
+            giveUpBtn.disabled = true;
         }
 
         function shareResult() {
+            if (!playerState.gameWon) return;
             const cluesUsed = playerState.lastCluesUsed;
-            if (!cluesUsed) return;
             const clueEmojis = '💡'.repeat(cluesUsed) + '⬛️'.repeat(5 - cluesUsed);
             const shareText = `El Acertijo del Día 🕵️‍♂️\n¡Adiviné en ${cluesUsed}/5 pistas!\n${clueEmojis}\n\n¡Juega tú también!`;
             
             if (navigator.share) {
-                navigator.share({ title: 'Mi resultado de El Acertijo del Día', text: shareText, url: window.location.href, }).catch(console.error);
+                navigator.share({ title: 'Mi resultado de El Acertijo del Día', text: shareText, url: window.location.href }).catch(console.error);
             } else {
                 navigator.clipboard.writeText(shareText + "\n" + window.location.href).then(() => {
-                    const btn = playerState.gameOver ? (statsScreen.classList.contains('hidden') ? shareBtn : shareStatsBtn) : shareStatsBtn;
+                    const btn = document.getElementById(endGameModal.classList.contains('hidden') ? 'share-stats-btn' : 'share-btn');
                     const originalText = btn.innerHTML;
                     btn.textContent = '¡Copiado!';
                     setTimeout(() => { btn.innerHTML = originalText; }, 2000);
@@ -490,7 +569,6 @@ La respuesta debe estar en un formato JSON estricto, sin texto adicional antes o
             setInterval(update, 1000);
         }
 
-        // --- FUNCIONES DE UTILIDAD Y ESTADÍSTICAS ---
         function getArgentinaDateString() {
             const now = new Date();
             const formatter = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' });
@@ -509,9 +587,7 @@ La respuesta debe estar en un formato JSON estricto, sin texto adicional antes o
 
         function loadStats() {
             const storedStats = JSON.parse(localStorage.getItem(STATS_STORAGE_KEY));
-            if (storedStats) {
-                playerStats = storedStats;
-            }
+            if (storedStats) playerStats = storedStats;
         }
 
         function saveStats() {
@@ -520,12 +596,9 @@ La respuesta debe estar en un formato JSON estricto, sin texto adicional antes o
 
         function updateStats() {
             const todayString = getArgentinaDateString();
-            // Evitar contar la misma partida dos veces si se recarga la página
             if (playerStats.lastPlayDate === todayString) return;
-
             playerStats.plays++;
             playerStats.lastPlayDate = todayString;
-
             if (playerState.gameWon) {
                 playerStats.wins++;
                 playerStats.currentStreak++;
